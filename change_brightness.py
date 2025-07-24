@@ -8,6 +8,8 @@ from multiprocessing import Process
 from pathlib import Path
 
 PID_FILE = Path("/tmp/ddc_brightness_setter.pid")
+COUNTER_FILE = Path("/tmp/ddc_brightness_counter")
+# COUNTER_FILE.touch(exist_ok=True)
 
 def get_current_brightness():
     for _ in range(4):
@@ -22,10 +24,32 @@ def get_current_brightness():
 
     return None
 
+
+
+def set_counter(flag):
+    if flag == 'increment':
+        try:
+            with COUNTER_FILE.open("r") as f:
+                current_value = int(f.read())
+
+            with COUNTER_FILE.open("w") as f:
+                new_value = current_value + 1
+                f.write(str(new_value))
+
+        except FileNotFoundError:
+            with COUNTER_FILE.open("w") as f:
+                f.write("1")
+                
+    elif flag == 'set':
+        with COUNTER_FILE.open("w") as f:
+            f.write("0")
+
+
 def set_brightness(value):
     for _ in range(4):
         try:
             subprocess.run(['ddcutil', 'setvcp', '10', str(value)], check=True)
+            set_counter('set')
             break
         except subprocess.CalledProcessError as e:
             print("Failed to set brightness. Retrying.")
@@ -37,9 +61,12 @@ def brightness_worker(value):
     print("Starting brightness worker")
     time.sleep(.2)
 
+    with COUNTER_FILE.open("r") as f:
+        c = int(f.read())
+
     current = get_current_brightness()
     if current is not None:
-        new = min(current + value, 100)
+        new = min(current + (value*c), 100)
         set_brightness(new)
 
 def kill_previous():
@@ -56,6 +83,7 @@ def kill_previous():
 def main(value):
     # Kill the previous process
     kill_previous()
+    set_counter('increment')
     # Start a new process
     p = Process(target=brightness_worker, args=(value,))
     p.start()

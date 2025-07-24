@@ -1,3 +1,3 @@
 #!/bin/bash
 cd /home/pchauhan/Documents/
-python3 change_brightness.py -10
+python3 change_brightness.py -5
